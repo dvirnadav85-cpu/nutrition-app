@@ -10,7 +10,40 @@ st.set_page_config(
 
 st.markdown("""
     <style>
+        /* RTL base */
         * { direction: rtl; text-align: right; }
+
+        /* Move sidebar to the right for RTL */
+        section[data-testid="stSidebar"] {
+            right: 0;
+            left: auto;
+        }
+
+        /* Mobile: make content full width and improve spacing */
+        @media (max-width: 768px) {
+            .main .block-container {
+                padding: 1rem 1rem 5rem 1rem !important;
+                max-width: 100% !important;
+            }
+            /* Larger tap targets for buttons */
+            .stButton > button {
+                width: 100%;
+                padding: 0.75rem !important;
+                font-size: 1.1rem !important;
+            }
+            /* Bigger text inputs on mobile */
+            .stTextInput input, .stTextArea textarea {
+                font-size: 1rem !important;
+            }
+            /* Chat input bigger on mobile */
+            .stChatInputContainer {
+                padding: 0.5rem !important;
+            }
+        }
+
+        /* Hide Streamlit branding */
+        #MainMenu { visibility: hidden; }
+        footer { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -34,7 +67,7 @@ if not st.session_state.authenticated:
             st.error("סיסמה שגויה. נסי שוב.")
 else:
     st.title("🥗 עוזר תזונה אישי")
-    st.success("התחברת בהצלחה! השתמשי בתפריט משמאל לניווט.")
+    st.success("התחברת בהצלחה! השתמשי בתפריט לניווט בין הדפים.")
     st.markdown("""
     ### מה תרצי לעשות?
     - 💬 **שיחה** — דברי עם העוזרת שלך
