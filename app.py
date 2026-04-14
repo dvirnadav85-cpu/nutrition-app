@@ -13,31 +13,25 @@ st.markdown("""
         /* RTL base */
         * { direction: rtl; text-align: right; }
 
-        /* Move sidebar to the right for RTL */
-        section[data-testid="stSidebar"] {
-            right: 0;
-            left: auto;
-        }
-
-        /* Mobile: make content full width and improve spacing */
+        /* Mobile: hide sidebar icon strip, use top arrows for navigation instead */
         @media (max-width: 768px) {
+            section[data-testid="stSidebar"] {
+                display: none !important;
+            }
+            [data-testid="collapsedControl"] {
+                display: none !important;
+            }
             .main .block-container {
                 padding: 1rem 1rem 5rem 1rem !important;
                 max-width: 100% !important;
             }
-            /* Larger tap targets for buttons */
             .stButton > button {
                 width: 100%;
                 padding: 0.75rem !important;
                 font-size: 1.1rem !important;
             }
-            /* Bigger text inputs on mobile */
             .stTextInput input, .stTextArea textarea {
                 font-size: 1rem !important;
-            }
-            /* Chat input bigger on mobile */
-            .stChatInputContainer {
-                padding: 0.5rem !important;
             }
         }
 
