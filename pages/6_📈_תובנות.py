@@ -15,6 +15,7 @@ if not st.session_state.get("authenticated"):
     st.warning("אנא התחברי מהדף הראשי תחילה.")
     st.stop()
 
+if st.button("🏠 בית"): st.switch_page("app.py")
 st.title("📈 תובנות שבועיות")
 st.caption("ניתוח מעמיק של השבוע האחרון — תזונה, משקל ומגמות")
 

@@ -21,6 +21,7 @@ if not st.session_state.get("authenticated"):
     st.warning("אנא התחברי מהדף הראשי תחילה.")
     st.stop()
 
+if st.button("🏠 בית"): st.switch_page("app.py")
 st.title("💬 שיחה עם העוזרת")
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
