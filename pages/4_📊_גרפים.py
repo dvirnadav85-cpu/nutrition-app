@@ -5,7 +5,6 @@ from datetime import date, timedelta
 from collections import Counter, defaultdict
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
 import supabase_client as db
 
 st.set_page_config(page_title="גרפים", page_icon="📊", layout="centered")
@@ -50,8 +49,6 @@ else:
         mode="lines+markers",
         line=dict(color="#4CAF50", width=3),
         marker=dict(size=8, color="#4CAF50"),
-        fill="tozeroy",
-        fillcolor="rgba(76,175,80,0.08)",
         name="משקל",
         hovertemplate="%{x}<br>%{y:.1f} ק״ג<extra></extra>",
     ))
@@ -75,7 +72,6 @@ else:
 
     fig.update_layout(**PLOTLY_LAYOUT,
                       title="משקל לאורך זמן (ק״ג)",
-                      yaxis_title="ק״ג",
                       legend=dict(orientation="h", y=1.1))
     # tighten y-axis around data
     y_pad = max((max(weights) - min(weights)) * 0.2, 1)
@@ -119,10 +115,8 @@ else:
     fig2.update_layout(**PLOTLY_LAYOUT,
                        title="ארוחות לפי יום וסוג",
                        barmode="stack",
-                       xaxis_title="תאריך",
-                       yaxis_title="מספר ארוחות",
-                       yaxis=dict(tickformat="d", **PLOTLY_LAYOUT["yaxis"]),
                        legend=dict(orientation="h", y=1.12))
+    fig2.update_yaxes(tickformat="d")   # whole numbers only
     st.plotly_chart(fig2, use_container_width=True)
     st.caption(f"סה״כ {len(recent_meals)} ארוחות ב-14 הימים האחרונים")
 
@@ -181,7 +175,6 @@ else:
             ))
             fig_b.update_layout(**PLOTLY_LAYOUT,
                                 title=marker_name,
-                                yaxis_title="ערך",
                                 showlegend=False)
             y_pad = max((max(ys) - min(ys)) * 0.25, max(ys) * 0.05, 1)
             fig_b.update_yaxes(range=[min(ys) - y_pad, max(ys) + y_pad])
