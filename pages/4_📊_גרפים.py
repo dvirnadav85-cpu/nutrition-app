@@ -109,20 +109,14 @@ else:
             hoverinfo="skip",
         ))
 
-    fig2.update_layout(
-        **BASE_LAYOUT,
-        height=280,                          # taller to fit legend below
-        title="ארוחות לפי יום וסוג",
-        barmode="stack",
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            x=0, y=-0.28,
-            xanchor="left",
-            font=dict(size=12),
-        ),
-        margin=dict(l=45, r=10, t=40, b=80),  # extra bottom for legend
-    )
+    fig2.update_layout(**BASE_LAYOUT,
+                       title="ארוחות לפי יום וסוג",
+                       barmode="stack",
+                       showlegend=True,
+                       legend=dict(orientation="h", x=0, y=-0.28,
+                                   xanchor="left", font=dict(size=12)))
+    # override height and margin separately (can't pass twice in one call)
+    fig2.update_layout(height=280, margin=dict(l=45, r=10, t=40, b=80))
     fig2.update_yaxes(tickformat="d")
     st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
     st.caption(f"סה״כ {len(recent_meals)} ארוחות ב-14 הימים האחרונים")
