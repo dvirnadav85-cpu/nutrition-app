@@ -1,60 +1,190 @@
+import json
 import config
+import common
 from datetime import date, timedelta
-from collections import Counter
+from collections import Counter, defaultdict
 import streamlit as st
+import plotly.graph_objects as go
+import plotly.express as px
 import supabase_client as db
 
 st.set_page_config(page_title="גרפים", page_icon="📊", layout="centered")
-
-st.markdown("""
-    <style>* { direction: rtl; text-align: right; }</style>
-""", unsafe_allow_html=True)
-
-if not st.session_state.get("authenticated"):
-    st.warning("אנא התחברי מהדף הראשי תחילה.")
-    st.stop()
+common.page_setup()
 
 if st.button("🏠 בית"): st.switch_page("app.py")
 st.title("📊 גרפים ומגמות")
 
-# --- Weight chart ---
+# ── helper ───────────────────────────────────────────────────────────────────
+PLOTLY_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="Arial, sans-serif", size=14),
+    margin=dict(l=10, r=10, t=40, b=40),
+    xaxis=dict(showgrid=True, gridcolor="#e5e5e5"),
+    yaxis=dict(showgrid=True, gridcolor="#e5e5e5", zeroline=False),
+)
+
+# ── Weight chart ──────────────────────────────────────────────────────────────
 st.markdown("### ⚖️ מגמת משקל")
 
 weight_rows = db.select("weight_log", order="log_date.asc")
 
 if len(weight_rows) < 2:
     st.info("יש לרשום לפחות שתי שקילות כדי לראות גרף. שלחי את משקלך בשיחה!")
-elif weight_rows:
-    dates = [r["log_date"] for r in weight_rows]
+else:
+    dates   = [r["log_date"]         for r in weight_rows]
     weights = [float(r["weight_kg"]) for r in weight_rows]
 
     first_w, last_w = weights[0], weights[-1]
     delta = last_w - first_w
     delta_str = f"{'↓' if delta < 0 else '↑'} {abs(delta):.1f} ק״ג מאז ההתחלה"
 
-    col1, col2 = st.columns(2)
-    col1.metric("משקל נוכחי", f"{last_w} ק״ג", delta_str)
-    col2.metric("מדידות", len(weight_rows))
+    col1, col2, col3 = st.columns(3)
+    col1.metric("משקל נוכחי",  f"{last_w:.1f} ק״ג", delta_str)
+    col2.metric("משקל התחלתי", f"{first_w:.1f} ק״ג")
+    col3.metric("מדידות",      len(weight_rows))
 
-    st.line_chart({"משקל (ק״ג)": weights}, x_label="מדידה", y_label="ק״ג")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=dates, y=weights,
+        mode="lines+markers",
+        line=dict(color="#4CAF50", width=3),
+        marker=dict(size=8, color="#4CAF50"),
+        fill="tozeroy",
+        fillcolor="rgba(76,175,80,0.08)",
+        name="משקל",
+        hovertemplate="%{x}<br>%{y:.1f} ק״ג<extra></extra>",
+    ))
+    # trend line (simple linear)
+    if len(weights) >= 3:
+        n = len(weights)
+        x_idx = list(range(n))
+        mean_x = sum(x_idx) / n
+        mean_y = sum(weights) / n
+        slope  = sum((x_idx[i] - mean_x) * (weights[i] - mean_y) for i in range(n)) / \
+                 sum((x_idx[i] - mean_x) ** 2 for i in range(n))
+        intercept = mean_y - slope * mean_x
+        trend = [intercept + slope * i for i in x_idx]
+        fig.add_trace(go.Scatter(
+            x=dates, y=trend,
+            mode="lines",
+            line=dict(color="#FF9800", width=2, dash="dash"),
+            name="מגמה",
+            hoverinfo="skip",
+        ))
+
+    fig.update_layout(**PLOTLY_LAYOUT,
+                      title="משקל לאורך זמן (ק״ג)",
+                      yaxis_title="ק״ג",
+                      legend=dict(orientation="h", y=1.1))
+    # tighten y-axis around data
+    y_pad = max((max(weights) - min(weights)) * 0.2, 1)
+    fig.update_yaxes(range=[min(weights) - y_pad, max(weights) + y_pad])
+    st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 
-# --- Meals per day ---
+# ── Meals per day ─────────────────────────────────────────────────────────────
 st.markdown("### 🍽️ ארוחות ב-14 הימים האחרונים")
 
-from_date = (date.today() - timedelta(days=13)).isoformat()
-all_meals = db.select("meal_log", order="meal_date.asc")
+from_date   = (date.today() - timedelta(days=13)).isoformat()
+all_meals   = db.select("meal_log", order="meal_date.asc")
 recent_meals = [m for m in all_meals if m.get("meal_date", "") >= from_date]
 
 if not recent_meals:
     st.info("טרם נרשמו ארוחות. ספרי לעוזרת מה אכלת בשיחה!")
 else:
-    # Build last 14 days with counts
-    day_labels = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
-    counts = Counter(m["meal_date"] for m in recent_meals)
+    day_labels  = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+    counts      = Counter(m["meal_date"] for m in recent_meals)
     meal_counts = [counts.get(d, 0) for d in day_labels]
-    short_labels = [d[5:] for d in day_labels]  # MM-DD format
+    short_labels = [d[5:] for d in day_labels]   # MM-DD
 
-    st.bar_chart({"ארוחות": meal_counts}, x_label="תאריך", y_label="מספר ארוחות")
+    # stacked by meal type
+    type_by_day: dict[str, list[int]] = defaultdict(lambda: [0] * 14)
+    for m in recent_meals:
+        if m["meal_date"] in day_labels:
+            idx = day_labels.index(m["meal_date"])
+            type_by_day[m.get("meal_type", "אחר")][idx] += 1
+
+    COLORS = ["#4CAF50", "#2196F3", "#FF9800", "#E91E63", "#9C27B0", "#00BCD4"]
+    fig2 = go.Figure()
+    for i, (mtype, vals) in enumerate(type_by_day.items()):
+        fig2.add_trace(go.Bar(
+            x=short_labels, y=vals,
+            name=mtype,
+            marker_color=COLORS[i % len(COLORS)],
+            hovertemplate="%{x}<br>" + mtype + ": %{y}<extra></extra>",
+        ))
+
+    fig2.update_layout(**PLOTLY_LAYOUT,
+                       title="ארוחות לפי יום וסוג",
+                       barmode="stack",
+                       xaxis_title="תאריך",
+                       yaxis_title="מספר ארוחות",
+                       yaxis=dict(tickformat="d", **PLOTLY_LAYOUT["yaxis"]),
+                       legend=dict(orientation="h", y=1.12))
+    st.plotly_chart(fig2, use_container_width=True)
     st.caption(f"סה״כ {len(recent_meals)} ארוחות ב-14 הימים האחרונים")
+
+st.divider()
+
+# ── Blood markers over time ───────────────────────────────────────────────────
+st.markdown("### 🩸 מגמות בדיקות דם לאורך זמן")
+
+blood_rows = db.select("blood_results", order="test_date.asc")
+
+if not blood_rows:
+    st.info("טרם הועלו בדיקות דם. העלי בדיקה בדף 'בדיקות דם'!")
+else:
+    # Collect all marker values per date
+    marker_timeseries: dict[str, list[tuple[str, float]]] = defaultdict(list)
+
+    for row in blood_rows:
+        test_date_str = row.get("test_date", "")
+        markers_raw   = row.get("markers")
+        if not markers_raw or not test_date_str:
+            continue
+        try:
+            markers = json.loads(markers_raw) if isinstance(markers_raw, str) else markers_raw
+            for marker_name, value in markers.items():
+                try:
+                    marker_timeseries[marker_name].append((test_date_str, float(value)))
+                except (TypeError, ValueError):
+                    pass
+        except Exception:
+            pass
+
+    # Only show markers that appear in at least 2 tests (trends) or all markers if <2 tests
+    min_points = 2 if len(blood_rows) >= 2 else 1
+    plottable  = {k: v for k, v in marker_timeseries.items() if len(v) >= min_points}
+
+    if not plottable:
+        st.info("צברי לפחות 2 בדיקות דם כדי לראות מגמות.")
+    else:
+        BLOOD_COLORS = ["#E53935", "#8E24AA", "#1E88E5", "#43A047",
+                        "#FB8C00", "#00ACC1", "#F4511E", "#6D4C41"]
+
+        for idx, (marker_name, data_points) in enumerate(sorted(plottable.items())):
+            data_points_sorted = sorted(data_points, key=lambda x: x[0])
+            xs = [p[0] for p in data_points_sorted]
+            ys = [p[1] for p in data_points_sorted]
+            color = BLOOD_COLORS[idx % len(BLOOD_COLORS)]
+
+            fig_b = go.Figure()
+            fig_b.add_trace(go.Scatter(
+                x=xs, y=ys,
+                mode="lines+markers",
+                line=dict(color=color, width=2.5),
+                marker=dict(size=9, color=color),
+                name=marker_name,
+                hovertemplate="%{x}<br>" + marker_name + ": %{y}<extra></extra>",
+            ))
+            fig_b.update_layout(**PLOTLY_LAYOUT,
+                                title=marker_name,
+                                yaxis_title="ערך",
+                                showlegend=False)
+            y_pad = max((max(ys) - min(ys)) * 0.25, max(ys) * 0.05, 1)
+            fig_b.update_yaxes(range=[min(ys) - y_pad, max(ys) + y_pad])
+            st.plotly_chart(fig_b, use_container_width=True)
+
+        st.caption(f"מוצגים {len(plottable)} סמנים מתוך {len(blood_rows)} בדיקות")

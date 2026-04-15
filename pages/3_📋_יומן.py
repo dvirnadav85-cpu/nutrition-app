@@ -1,17 +1,11 @@
 import config
+import common
 from datetime import date
 import streamlit as st
 import supabase_client as db
 
 st.set_page_config(page_title="יומן תזונה", page_icon="📋", layout="centered")
-
-st.markdown("""
-    <style>* { direction: rtl; text-align: right; }</style>
-""", unsafe_allow_html=True)
-
-if not st.session_state.get("authenticated"):
-    st.warning("אנא התחברי מהדף הראשי תחילה.")
-    st.stop()
+common.page_setup()
 
 if st.button("🏠 בית"): st.switch_page("app.py")
 st.title("📋 יומן תזונה")

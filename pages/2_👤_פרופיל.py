@@ -1,16 +1,10 @@
 import config
+import common
 import streamlit as st
 import supabase_client as db
 
 st.set_page_config(page_title="פרופיל", page_icon="👤", layout="centered")
-
-st.markdown("""
-    <style>* { direction: rtl; text-align: right; }</style>
-""", unsafe_allow_html=True)
-
-if not st.session_state.get("authenticated"):
-    st.warning("אנא התחברי מהדף הראשי תחילה.")
-    st.stop()
+common.page_setup()
 
 if st.button("🏠 בית"): st.switch_page("app.py")
 st.title("👤 הפרופיל שלי")
@@ -42,6 +36,9 @@ with st.form("profile_form"):
     medications = st.text_area("תרופות ותוספים",
                                 value=current.get("medications", ""),
                                 placeholder="לדוגמה: מטפורמין 500מ״ג, ויטמין D...")
+    daily_activity = st.text_area("פעילות גופנית יומיומית",
+                                   value=current.get("daily_activity", ""),
+                                   placeholder="לדוגמה: הליכה 30 דקות כל יום, שחייה פעמיים בשבוע...")
     additional_notes = st.text_area("הערות נוספות",
                                      value=current.get("additional_notes", ""),
                                      placeholder="כל מידע נוסף שחשוב שהעוזרת תדע...")
@@ -60,6 +57,7 @@ if submitted:
         "health_goals": health_goals,
         "medical_conditions": medical_conditions,
         "medications": medications,
+        "daily_activity": daily_activity,
         "additional_notes": additional_notes,
         "is_current": True,
     })

@@ -4,6 +4,7 @@ import json
 import base64
 from datetime import date
 import config
+import common
 import anthropic
 import streamlit as st
 from pypdf import PdfReader
@@ -11,14 +12,7 @@ import io
 import supabase_client as db
 
 st.set_page_config(page_title="בדיקות דם", page_icon="🩸", layout="centered")
-
-st.markdown("""
-    <style>* { direction: rtl; text-align: right; }</style>
-""", unsafe_allow_html=True)
-
-if not st.session_state.get("authenticated"):
-    st.warning("אנא התחברי מהדף הראשי תחילה.")
-    st.stop()
+common.page_setup()
 
 if st.button("🏠 בית"): st.switch_page("app.py")
 st.title("🩸 בדיקות דם")

@@ -1,19 +1,13 @@
 import os
 import config
+import common
 from datetime import date, timedelta
 import anthropic
 import streamlit as st
 import supabase_client as db
 
 st.set_page_config(page_title="תובנות שבועיות", page_icon="📈", layout="centered")
-
-st.markdown("""
-    <style>* { direction: rtl; text-align: right; }</style>
-""", unsafe_allow_html=True)
-
-if not st.session_state.get("authenticated"):
-    st.warning("אנא התחברי מהדף הראשי תחילה.")
-    st.stop()
+common.page_setup()
 
 if st.button("🏠 בית"): st.switch_page("app.py")
 st.title("📈 תובנות שבועיות")
@@ -51,6 +45,8 @@ def build_week_summary() -> str:
             lines.append(f"מטרות: {profile['health_goals']}")
         if profile.get("medical_conditions"):
             lines.append(f"מצבים רפואיים: {profile['medical_conditions']}")
+        if profile.get("daily_activity"):
+            lines.append(f"פעילות גופנית: {profile['daily_activity']}")
         lines.append("")
 
     lines.append(f"ארוחות שתועדו השבוע: {len(week_meals)}")
