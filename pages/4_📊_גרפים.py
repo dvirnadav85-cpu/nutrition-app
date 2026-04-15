@@ -13,14 +13,19 @@ common.page_setup()
 if st.button("🏠 בית"): st.switch_page("app.py")
 st.title("📊 גרפים ומגמות")
 
-# ── helper ───────────────────────────────────────────────────────────────────
-PLOTLY_LAYOUT = dict(
+# ── shared chart settings ─────────────────────────────────────────────────────
+# staticPlot=True → no toolbar, no zoom/pan, finger scrolls the page normally
+PLOTLY_CONFIG = {"staticPlot": True}
+
+BASE_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Arial, sans-serif", size=14),
-    margin=dict(l=10, r=10, t=40, b=40),
+    font=dict(family="Arial, sans-serif", size=13),
+    height=220,
+    margin=dict(l=55, r=10, t=40, b=35),
     xaxis=dict(showgrid=True, gridcolor="#e5e5e5"),
     yaxis=dict(showgrid=True, gridcolor="#e5e5e5", zeroline=False),
+    showlegend=False,
 )
 
 # ── Weight chart ──────────────────────────────────────────────────────────────
@@ -36,7 +41,7 @@ else:
 
     first_w, last_w = weights[0], weights[-1]
     delta = last_w - first_w
-    delta_str = f"{'↓' if delta < 0 else '↑'} {abs(delta):.1f} ק״ג מאז ההתחלה"
+    delta_str = f"{'↓' if delta < 0 else '↑'} {abs(delta):.1f} ק״ג"
 
     col1, col2, col3 = st.columns(3)
     col1.metric("משקל נוכחי",  f"{last_w:.1f} ק״ג", delta_str)
@@ -49,53 +54,45 @@ else:
         mode="lines+markers",
         line=dict(color="#4CAF50", width=3),
         marker=dict(size=8, color="#4CAF50"),
-        name="משקל",
-        hovertemplate="%{x}<br>%{y:.1f} ק״ג<extra></extra>",
+        hoverinfo="skip",
     ))
-    # trend line (simple linear)
+    # trend line (linear regression)
     if len(weights) >= 3:
         n = len(weights)
-        x_idx = list(range(n))
-        mean_x = sum(x_idx) / n
-        mean_y = sum(weights) / n
-        slope  = sum((x_idx[i] - mean_x) * (weights[i] - mean_y) for i in range(n)) / \
-                 sum((x_idx[i] - mean_x) ** 2 for i in range(n))
-        intercept = mean_y - slope * mean_x
-        trend = [intercept + slope * i for i in x_idx]
+        xi = list(range(n))
+        mx, my = sum(xi)/n, sum(weights)/n
+        slope = sum((xi[i]-mx)*(weights[i]-my) for i in range(n)) / \
+                sum((xi[i]-mx)**2 for i in range(n))
+        intercept = my - slope * mx
+        trend = [intercept + slope * i for i in xi]
         fig.add_trace(go.Scatter(
             x=dates, y=trend,
             mode="lines",
             line=dict(color="#FF9800", width=2, dash="dash"),
-            name="מגמה",
             hoverinfo="skip",
         ))
 
-    fig.update_layout(**PLOTLY_LAYOUT,
-                      title="משקל לאורך זמן (ק״ג)",
-                      legend=dict(orientation="h", y=1.1))
-    # tighten y-axis around data
-    y_pad = max((max(weights) - min(weights)) * 0.2, 1)
+    y_pad = max((max(weights) - min(weights)) * 0.25, 0.5)
+    fig.update_layout(**BASE_LAYOUT, title="משקל לאורך זמן (ק״ג)")
     fig.update_yaxes(range=[min(weights) - y_pad, max(weights) + y_pad])
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+    st.caption("🟢 קו ירוק — משקל בפועל  |  🟠 קו כתום — מגמה")
 
 st.divider()
 
 # ── Meals per day ─────────────────────────────────────────────────────────────
 st.markdown("### 🍽️ ארוחות ב-14 הימים האחרונים")
 
-from_date   = (date.today() - timedelta(days=13)).isoformat()
-all_meals   = db.select("meal_log", order="meal_date.asc")
+from_date    = (date.today() - timedelta(days=13)).isoformat()
+all_meals    = db.select("meal_log", order="meal_date.asc")
 recent_meals = [m for m in all_meals if m.get("meal_date", "") >= from_date]
 
 if not recent_meals:
     st.info("טרם נרשמו ארוחות. ספרי לעוזרת מה אכלת בשיחה!")
 else:
-    day_labels  = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
-    counts      = Counter(m["meal_date"] for m in recent_meals)
-    meal_counts = [counts.get(d, 0) for d in day_labels]
+    day_labels   = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
     short_labels = [d[5:] for d in day_labels]   # MM-DD
 
-    # stacked by meal type
     type_by_day: dict[str, list[int]] = defaultdict(lambda: [0] * 14)
     for m in recent_meals:
         if m["meal_date"] in day_labels:
@@ -109,15 +106,25 @@ else:
             x=short_labels, y=vals,
             name=mtype,
             marker_color=COLORS[i % len(COLORS)],
-            hovertemplate="%{x}<br>" + mtype + ": %{y}<extra></extra>",
+            hoverinfo="skip",
         ))
 
-    fig2.update_layout(**PLOTLY_LAYOUT,
-                       title="ארוחות לפי יום וסוג",
-                       barmode="stack",
-                       legend=dict(orientation="h", y=1.12))
-    fig2.update_yaxes(tickformat="d")   # whole numbers only
-    st.plotly_chart(fig2, use_container_width=True)
+    fig2.update_layout(
+        **BASE_LAYOUT,
+        height=280,                          # taller to fit legend below
+        title="ארוחות לפי יום וסוג",
+        barmode="stack",
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            x=0, y=-0.28,
+            xanchor="left",
+            font=dict(size=12),
+        ),
+        margin=dict(l=45, r=10, t=40, b=80),  # extra bottom for legend
+    )
+    fig2.update_yaxes(tickformat="d")
+    st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
     st.caption(f"סה״כ {len(recent_meals)} ארוחות ב-14 הימים האחרונים")
 
 st.divider()
@@ -130,7 +137,6 @@ blood_rows = db.select("blood_results", order="test_date.asc")
 if not blood_rows:
     st.info("טרם הועלו בדיקות דם. העלי בדיקה בדף 'בדיקות דם'!")
 else:
-    # Collect all marker values per date
     marker_timeseries: dict[str, list[tuple[str, float]]] = defaultdict(list)
 
     for row in blood_rows:
@@ -148,7 +154,6 @@ else:
         except Exception:
             pass
 
-    # Only show markers that appear in at least 2 tests (trends) or all markers if <2 tests
     min_points = 2 if len(blood_rows) >= 2 else 1
     plottable  = {k: v for k, v in marker_timeseries.items() if len(v) >= min_points}
 
@@ -159,9 +164,9 @@ else:
                         "#FB8C00", "#00ACC1", "#F4511E", "#6D4C41"]
 
         for idx, (marker_name, data_points) in enumerate(sorted(plottable.items())):
-            data_points_sorted = sorted(data_points, key=lambda x: x[0])
-            xs = [p[0] for p in data_points_sorted]
-            ys = [p[1] for p in data_points_sorted]
+            pts = sorted(data_points, key=lambda x: x[0])
+            xs  = [p[0] for p in pts]
+            ys  = [p[1] for p in pts]
             color = BLOOD_COLORS[idx % len(BLOOD_COLORS)]
 
             fig_b = go.Figure()
@@ -170,14 +175,11 @@ else:
                 mode="lines+markers",
                 line=dict(color=color, width=2.5),
                 marker=dict(size=9, color=color),
-                name=marker_name,
-                hovertemplate="%{x}<br>" + marker_name + ": %{y}<extra></extra>",
+                hoverinfo="skip",
             ))
-            fig_b.update_layout(**PLOTLY_LAYOUT,
-                                title=marker_name,
-                                showlegend=False)
             y_pad = max((max(ys) - min(ys)) * 0.25, max(ys) * 0.05, 1)
+            fig_b.update_layout(**BASE_LAYOUT, title=marker_name)
             fig_b.update_yaxes(range=[min(ys) - y_pad, max(ys) + y_pad])
-            st.plotly_chart(fig_b, use_container_width=True)
+            st.plotly_chart(fig_b, use_container_width=True, config=PLOTLY_CONFIG)
 
         st.caption(f"מוצגים {len(plottable)} סמנים מתוך {len(blood_rows)} בדיקות")
