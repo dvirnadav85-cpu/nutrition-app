@@ -22,7 +22,7 @@ BASE_LAYOUT = dict(
     plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family="Arial, sans-serif", size=13),
     height=220,
-    margin=dict(l=55, r=10, t=40, b=35),
+    margin=dict(l=50, r=50, t=15, b=35),   # equal L/R, small top (no Plotly title)
     xaxis=dict(showgrid=True, gridcolor="#e5e5e5"),
     yaxis=dict(showgrid=True, gridcolor="#e5e5e5", zeroline=False),
     showlegend=False,
@@ -56,7 +56,7 @@ else:
         marker=dict(size=8, color="#4CAF50"),
         hoverinfo="skip",
     ))
-    # trend line (linear regression)
+    # trend line (linear regression) — only when ≥3 points
     if len(weights) >= 3:
         n = len(weights)
         xi = list(range(n))
@@ -73,7 +73,7 @@ else:
         ))
 
     y_pad = max((max(weights) - min(weights)) * 0.25, 0.5)
-    fig.update_layout(**BASE_LAYOUT, title="משקל לאורך זמן (ק״ג)")
+    fig.update_layout(**BASE_LAYOUT)
     fig.update_yaxes(range=[min(weights) - y_pad, max(weights) + y_pad])
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
     st.caption("🟢 קו ירוק — משקל בפועל  |  🟠 קו כתום — מגמה")
@@ -111,12 +111,11 @@ else:
 
     fig2.update_layout(**BASE_LAYOUT)
     fig2.update_layout(
-        height=280,
-        margin=dict(l=45, r=10, t=40, b=80),
-        title="ארוחות לפי יום וסוג",
-        barmode="stack",
+        height=300,
+        margin=dict(l=50, r=50, t=15, b=90),   # extra bottom for legend
         showlegend=True,
-        legend=dict(orientation="h", x=0, y=-0.28, xanchor="left", font=dict(size=12)),
+        legend=dict(orientation="h", x=0.5, y=-0.35, xanchor="center", font=dict(size=12)),
+        barmode="stack",
     )
     fig2.update_yaxes(tickformat="d")
     st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
@@ -164,6 +163,9 @@ else:
             ys  = [p[1] for p in pts]
             color = BLOOD_COLORS[idx % len(BLOOD_COLORS)]
 
+            # Title above the chart (avoids RTL/Plotly clash)
+            st.markdown(f"**{marker_name}**")
+
             fig_b = go.Figure()
             fig_b.add_trace(go.Scatter(
                 x=xs, y=ys,
@@ -173,7 +175,7 @@ else:
                 hoverinfo="skip",
             ))
             y_pad = max((max(ys) - min(ys)) * 0.25, max(ys) * 0.05, 1)
-            fig_b.update_layout(**BASE_LAYOUT, title=marker_name)
+            fig_b.update_layout(**BASE_LAYOUT)
             fig_b.update_yaxes(range=[min(ys) - y_pad, max(ys) + y_pad])
             st.plotly_chart(fig_b, use_container_width=True, config=PLOTLY_CONFIG)
 

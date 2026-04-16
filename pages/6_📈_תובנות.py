@@ -101,7 +101,8 @@ INSIGHTS_PROMPT = """את עוזרת תזונה אישית חמה ומנוסה. 
 week_start = date.today() - timedelta(days=7)
 week_end = date.today()
 
-if st.button("✨ צרי דוח שבועי", type="primary"):
+_, col_btn, _ = st.columns([1, 2, 1])
+if col_btn.button("✨ צרי דוח שבועי", type="primary", use_container_width=True):
     with st.spinner("מנתחת את השבוע... זה עשוי לקחת כחצי דקה"):
         week_data = build_week_summary()
 
