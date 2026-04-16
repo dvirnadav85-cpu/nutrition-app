@@ -107,7 +107,7 @@ if col_btn.button("✨ צרי דוח שבועי", type="primary", use_container_
         week_data = build_week_summary()
 
         response = claude.messages.create(
-            model="claude-opus-4-6",
+            model="claude-sonnet-4-6",
             max_tokens=2048,
             messages=[{
                 "role": "user",

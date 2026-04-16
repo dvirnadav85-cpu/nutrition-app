@@ -108,17 +108,28 @@ def update_activity(description: str):
     rows = db.select("profile", filters={"is_current": "true"}, order="created_at.desc", limit=1)
     if rows:
         db.update("profile", {"daily_activity": description}, {"id": rows[0]["id"]})
+        st.session_state.cached_profile = None   # invalidate cache so next message picks it up
+
+def get_system(force_reload: bool = False) -> str:
+    """Return system prompt, using session-cached profile to avoid repeated DB calls."""
+    if force_reload or not st.session_state.get("cached_profile"):
+        st.session_state.cached_profile = load_profile_context()
+    return SYSTEM_PROMPT.format(profile=st.session_state.cached_profile)
+
+def cached_system_param(system: str) -> list:
+    """Wrap system prompt for Anthropic prompt caching (cache_control=ephemeral).
+    On repeated calls within 5 min, Anthropic charges only ~10% for the cached part."""
+    return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
 def analyze_photo(image_bytes: bytes, media_type: str = "image/jpeg") -> str:
     """Send a meal photo to Claude and get back a response with MEAL tag."""
     image_data = base64.standard_b64encode(image_bytes).decode("utf-8")
-    profile_context = load_profile_context()
-    system = SYSTEM_PROMPT.format(profile=profile_context)
+    system = get_system()
 
     response = claude.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1024,
-        system=system,
+        system=cached_system_param(system),
         messages=[{
             "role": "user",
             "content": [
@@ -129,9 +140,13 @@ def analyze_photo(image_bytes: bytes, media_type: str = "image/jpeg") -> str:
     )
     return response.content[0].text
 
-# Chat history
+MAX_HISTORY = 10   # messages sent to Claude (older ones stay visible but not re-sent)
+
+# Chat history + cached profile (reload from DB only when session starts)
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "cached_profile" not in st.session_state:
+    st.session_state.cached_profile = None
 
 # Display previous messages
 for message in st.session_state.messages:
@@ -187,14 +202,16 @@ if prompt := st.chat_input("כתבי הודעה..."):
 
     with st.chat_message("assistant"):
         with st.spinner("חושבת..."):
-            profile_context = load_profile_context()
-            system = SYSTEM_PROMPT.format(profile=profile_context)
+            system = get_system()
+            # send only the last MAX_HISTORY text messages to save tokens
+            text_messages = [m for m in st.session_state.messages if not m.get("is_image")]
+            recent = text_messages[-MAX_HISTORY:]
 
             response = claude.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=1024,
-                system=system,
-                messages=[m for m in st.session_state.messages if not m.get("is_image")],
+                system=cached_system_param(system),
+                messages=recent,
             )
             raw_reply = response.content[0].text
 
