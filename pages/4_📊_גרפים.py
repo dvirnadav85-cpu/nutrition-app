@@ -17,6 +17,17 @@ st.title("📊 גרפים ומגמות")
 # staticPlot=True → no toolbar, no zoom/pan, finger scrolls the page normally
 PLOTLY_CONFIG = {"staticPlot": True}
 
+MONTH_HE = ["", "ינו", "פבר", "מרץ", "אפר", "מאי", "יוני",
+            "יולי", "אוג", "ספט", "אוק", "נוב", "דצמ"]
+
+def short_date(iso: str) -> str:
+    """'2026-03-21' → 'מרץ 21'"""
+    try:
+        _, m, d = iso.split("-")
+        return f"{MONTH_HE[int(m)]} {int(d)}"
+    except Exception:
+        return iso
+
 BASE_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
@@ -36,8 +47,8 @@ weight_rows = db.select("weight_log", order="log_date.asc")
 if len(weight_rows) < 2:
     st.info("יש לרשום לפחות שתי שקילות כדי לראות גרף. שלחי את משקלך בשיחה!")
 else:
-    dates   = [r["log_date"]         for r in weight_rows]
-    weights = [float(r["weight_kg"]) for r in weight_rows]
+    dates   = [short_date(r["log_date"]) for r in weight_rows]
+    weights = [float(r["weight_kg"])    for r in weight_rows]
 
     first_w, last_w = weights[0], weights[-1]
     delta = last_w - first_w
@@ -159,7 +170,7 @@ else:
 
         for idx, (marker_name, data_points) in enumerate(sorted(plottable.items())):
             pts = sorted(data_points, key=lambda x: x[0])
-            xs  = [p[0] for p in pts]
+            xs  = [short_date(p[0]) for p in pts]
             ys  = [p[1] for p in pts]
             color = BLOOD_COLORS[idx % len(BLOOD_COLORS)]
 
