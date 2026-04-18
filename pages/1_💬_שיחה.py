@@ -34,60 +34,56 @@ def load_profile_context() -> str:
     if p.get("additional_notes"):   parts.append(f"הערות: {p['additional_notes']}")
     return "\n".join(parts)
 
-SYSTEM_PROMPT = """את עוזרת תזונה אישית חמה ומעודדת. את מדברת עברית בלבד.
-את עוזרת למשתמשת לעקוב אחר התזונה שלה, מעודדת אותה, ומספקת מידע תזונתי שימושי.
-תמיד תהיי חיובית ולא שיפוטית.
-כשמדובר בהחלטות רפואיות, תמיד הפני לרופא או דיאטנית מוסמכת.
+SYSTEM_PROMPT = """את עוזרת תזונה אישית חמה ומעודדת של מירה. את מדברת עברית בלבד.
+את עוזרת למירה לעקוב אחר התזונה שלה ומספקת מידע תזונתי שימושי על בסיס הנתונים שיש לך.
+תהיי תמיד חיובית, לא שיפוטית, וענייה — ענני על שאלות לפי הנתונים הזמינים.
+הוסיפי הפניה לרופאה רק כאשר מדובר בתסמין חדש, שינוי פתאומי, או החלטה טיפולית ממשית — לא בכל תגובה.
 
 פרטי המשתמשת:
 {profile}
 
 ---
 **רישום ארוחות:**
-כאשר המשתמשת מספרת שאכלה משהו (בטקסט או בתמונה), תגיבי בחום ובסוף הוסיפי:
+כאשר מירה מספרת שאכלה משהו (בטקסט או בתמונה), תגיבי בחום ובסוף הוסיפי:
 <!--MEAL:{{"type":"סוג הארוחה","description":"תיאור קצר"}}-->
 סוגים: ארוחת בוקר, ארוחת צהריים, ארוחת ערב, חטיף, שתייה
 
 **רישום משקל:**
-כאשר המשתמשת מציינת את משקלה, תגיבי בחום ובסוף הוסיפי:
+כאשר מירה מציינת את משקלה, תגיבי בחום ובסוף הוסיפי:
 <!--WEIGHT:{{"kg": 68.0}}-->
 
 **עדכון פעילות גופנית:**
-כאשר המשתמשת מתארת את הפעילות הגופנית הקבועה שלה (כמה פעמים בשבוע, סוג פעילות), תגיבי בחום ובסוף הוסיפי:
+כאשר מירה מתארת את הפעילות הגופנית הקבועה שלה, תגיבי בחום ובסוף הוסיפי:
 <!--ACTIVITY:{{"description":"תיאור קצר של הפעילות הקבועה"}}-->
+
+**עדכון תרופות ותוספים:**
+כאשר מירה מזכירה תרופה, תוסף, או ויטמין שהיא נוטלת באופן קבוע, תגיבי בחום ובסוף הוסיפי:
+<!--MEDICATION:{{"medications":"רשימת התרופות והתוספים"}}-->
 
 אל תכתבי תגיות אם לא צוין מידע רלוונטי."""
 
-def parse_tags(text: str) -> tuple[str, dict | None, dict | None, dict | None]:
-    meal_data = None
-    weight_data = None
-    activity_data = None
+def parse_tags(text: str) -> tuple[str, dict | None, dict | None, dict | None, dict | None]:
+    meal_data = weight_data = activity_data = medication_data = None
 
-    meal_match = re.search(r'<!--MEAL:(\{.*?\})-->', text, re.DOTALL)
-    if meal_match:
-        try:
-            meal_data = json.loads(meal_match.group(1))
-            text = text[:meal_match.start()].rstrip() + text[meal_match.end():]
-        except json.JSONDecodeError:
-            pass
+    for tag, store in [
+        (r'<!--MEAL:(\{.*?\})-->',       'meal'),
+        (r'<!--WEIGHT:(\{.*?\})-->',     'weight'),
+        (r'<!--ACTIVITY:(\{.*?\})-->',   'activity'),
+        (r'<!--MEDICATION:(\{.*?\})-->', 'medication'),
+    ]:
+        m = re.search(tag, text, re.DOTALL)
+        if m:
+            try:
+                parsed = json.loads(m.group(1))
+                text = text[:m.start()].rstrip() + text[m.end():]
+                if store == 'meal':       meal_data       = parsed
+                elif store == 'weight':   weight_data     = parsed
+                elif store == 'activity': activity_data   = parsed
+                else:                     medication_data = parsed
+            except json.JSONDecodeError:
+                pass
 
-    weight_match = re.search(r'<!--WEIGHT:(\{.*?\})-->', text, re.DOTALL)
-    if weight_match:
-        try:
-            weight_data = json.loads(weight_match.group(1))
-            text = text[:weight_match.start()].rstrip() + text[weight_match.end():]
-        except json.JSONDecodeError:
-            pass
-
-    activity_match = re.search(r'<!--ACTIVITY:(\{.*?\})-->', text, re.DOTALL)
-    if activity_match:
-        try:
-            activity_data = json.loads(activity_match.group(1))
-            text = text[:activity_match.start()].rstrip() + text[activity_match.end():]
-        except json.JSONDecodeError:
-            pass
-
-    return text.strip(), meal_data, weight_data, activity_data
+    return text.strip(), meal_data, weight_data, activity_data, medication_data
 
 def save_meal(raw_input: str, meal_type: str, description: str):
     db.insert("meal_log", {
@@ -97,6 +93,20 @@ def save_meal(raw_input: str, meal_type: str, description: str):
         "raw_input": raw_input,
     })
 
+def show_daily_summary():
+    """Show today's meal log as a compact table after a meal is saved."""
+    today = date.today().isoformat()
+    meals = db.select("meal_log", filters={"meal_date": today}, order="created_at.asc")
+    if not meals:
+        return
+    st.markdown("**📋 סיכום ארוחות היום:**")
+    rows = []
+    for m in meals:
+        time_str = m.get("created_at", "")
+        time_str = time_str[11:16] if len(time_str) > 15 else ""
+        rows.append({"סוג": m.get("meal_type",""), "תיאור": m.get("description",""), "שעה": time_str})
+    st.table(rows)
+
 def save_weight(kg: float):
     db.insert("weight_log", {
         "log_date": date.today().isoformat(),
@@ -104,11 +114,16 @@ def save_weight(kg: float):
     })
 
 def update_activity(description: str):
-    """Update daily_activity on the current profile row (in-place, no versioning needed)."""
     rows = db.select("profile", filters={"is_current": "true"}, order="created_at.desc", limit=1)
     if rows:
         db.update("profile", {"daily_activity": description}, {"id": rows[0]["id"]})
-        st.session_state.cached_profile = None   # invalidate cache so next message picks it up
+        st.session_state.cached_profile = None
+
+def update_medications(medications: str):
+    rows = db.select("profile", filters={"is_current": "true"}, order="created_at.desc", limit=1)
+    if rows:
+        db.update("profile", {"medications": medications}, {"id": rows[0]["id"]})
+        st.session_state.cached_profile = None
 
 def get_system(force_reload: bool = False) -> str:
     """Return system prompt, using session-cached profile to avoid repeated DB calls."""
@@ -180,7 +195,7 @@ if active_photo and not st.session_state.get("_last_photo") == active_photo.name
         with st.spinner("מזהה את האוכל בתמונה..."):
             raw_reply = analyze_photo(image_bytes)
 
-        clean_reply, meal_data, weight_data, activity_data = parse_tags(raw_reply)
+        clean_reply, meal_data, weight_data, activity_data, medication_data = parse_tags(raw_reply)
 
         if meal_data:
             save_meal(
@@ -191,6 +206,8 @@ if active_photo and not st.session_state.get("_last_photo") == active_photo.name
             clean_reply += "\n\n*✅ הארוחה נרשמה ביומן*"
 
         st.markdown(clean_reply)
+        if meal_data:
+            show_daily_summary()
 
     st.session_state.messages.append({"role": "assistant", "content": clean_reply})
 
@@ -215,7 +232,7 @@ if prompt := st.chat_input("כתבי הודעה..."):
             )
             raw_reply = response.content[0].text
 
-        clean_reply, meal_data, weight_data, activity_data = parse_tags(raw_reply)
+        clean_reply, meal_data, weight_data, activity_data, medication_data = parse_tags(raw_reply)
 
         if meal_data:
             save_meal(
@@ -233,6 +250,12 @@ if prompt := st.chat_input("כתבי הודעה..."):
             update_activity(activity_data.get("description", ""))
             clean_reply += f"\n\n*✅ הפעילות הגופנית עודכנה בפרופיל*"
 
+        if medication_data:
+            update_medications(medication_data.get("medications", ""))
+            clean_reply += f"\n\n*✅ התרופות עודכנו בפרופיל*"
+
         st.markdown(clean_reply)
+        if meal_data:
+            show_daily_summary()
 
     st.session_state.messages.append({"role": "assistant", "content": clean_reply})
