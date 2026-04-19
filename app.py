@@ -26,3 +26,6 @@ if st.button("🩸  בדיקות דם", use_container_width=True):
     st.switch_page("pages/5_🩸_בדיקות_דם.py")
 if st.button("📈  תובנות שבועיות", use_container_width=True):
     st.switch_page("pages/6_📈_תובנות.py")
+
+st.markdown("---")
+common.show_nutrition_table()

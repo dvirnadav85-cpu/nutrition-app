@@ -7,6 +7,8 @@ import streamlit as st
 import plotly.graph_objects as go
 import supabase_client as db
 
+NUTRIENT_LABELS = common.NUTRIENT_LABELS
+
 st.set_page_config(page_title="גרפים", page_icon="📊", layout="centered")
 common.page_setup()
 
@@ -145,46 +147,97 @@ else:
 
 st.divider()
 
-# ── Meals per day ─────────────────────────────────────────────────────────────
-st.markdown("### 🍽️ ארוחות ב-14 הימים האחרונים")
+# ── Nutrient trend (user-selectable) ──────────────────────────────────────────
+st.markdown("### 🍽️ מגמת רכיב תזונתי ב-14 הימים האחרונים")
 
+goals = common.get_daily_goals()
 from_date    = (date.today() - timedelta(days=13)).isoformat()
 all_meals    = db.select("meal_log", order="meal_date.asc")
 recent_meals = [m for m in all_meals if m.get("meal_date", "") >= from_date]
 
-if not recent_meals:
-    st.info("טרם נרשמו ארוחות. ספרי לעוזרת מה אכלת בשיחה!")
+# Collect all nutrient keys that appear in recent meals
+available_keys: set[str] = set()
+for m in recent_meals:
+    n = m.get("nutrients")
+    if isinstance(n, str):
+        try:
+            n = json.loads(n)
+        except Exception:
+            n = None
+    if isinstance(n, dict):
+        available_keys.update(n.keys())
+
+# Prefer keys that also have a goal; fall back to any that appear in meals
+pickable = sorted(available_keys | set(goals.keys()))
+
+if not pickable:
+    st.info("עוד אין נתוני תזונה. לאחר הגדרת יעדים ורישום ארוחות — מגמות יופיעו כאן.")
 else:
+    # Display labels for the selector
+    def _label(k: str) -> str:
+        name, unit = NUTRIENT_LABELS.get(k, (k, ""))
+        return f"{name} ({unit})" if unit else name
+
+    choice = st.selectbox("בחרי רכיב לתצוגה:", pickable, format_func=_label, index=0)
+
     day_labels   = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
-    short_labels = [d[5:] for d in day_labels]   # MM-DD
+    short_labels = [short_date(d) for d in day_labels]
 
-    type_by_day: dict[str, list[int]] = defaultdict(lambda: [0] * 14)
+    by_day: dict[str, float] = defaultdict(float)
     for m in recent_meals:
-        if m["meal_date"] in day_labels:
-            idx = day_labels.index(m["meal_date"])
-            type_by_day[m.get("meal_type", "אחר")][idx] += 1
+        n = m.get("nutrients")
+        if isinstance(n, str):
+            try:
+                n = json.loads(n)
+            except Exception:
+                continue
+        if not isinstance(n, dict):
+            continue
+        val = n.get(choice)
+        if val is None:
+            continue
+        try:
+            by_day[m["meal_date"]] += float(val)
+        except (TypeError, ValueError):
+            pass
 
-    COLORS = ["#4CAF50", "#2196F3", "#FF9800", "#E91E63", "#9C27B0", "#00BCD4"]
-    fig2 = go.Figure()
-    for i, (mtype, vals) in enumerate(type_by_day.items()):
+    vals = [by_day.get(d, 0) for d in day_labels]
+    has_data = [v for v in vals if v > 0]
+
+    if not has_data:
+        st.info("אין עדיין נתונים לרכיב זה ב-14 הימים האחרונים.")
+    else:
+        avg_val = sum(has_data) / len(has_data)
+        _, unit = NUTRIENT_LABELS.get(choice, (choice, ""))
+        goal_val = goals.get(choice)
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("ממוצע יומי", f"{avg_val:.0f} {unit}".strip())
+        col2.metric("ימים עם נתונים", len(has_data))
+        if goal_val:
+            col3.metric("יעד יומי", f"{float(goal_val):.0f} {unit}".strip())
+
+        bar_colors = ["#4CAF50" if v > 0 else "#e0e0e0" for v in vals]
+        fig2 = go.Figure()
         fig2.add_trace(go.Bar(
             x=short_labels, y=vals,
-            name=mtype,
-            marker_color=COLORS[i % len(COLORS)],
+            marker_color=bar_colors,
             hoverinfo="skip",
         ))
-
-    fig2.update_layout(**BASE_LAYOUT)
-    fig2.update_layout(
-        height=300,
-        margin=dict(l=50, r=50, t=15, b=90),   # extra bottom for legend
-        showlegend=True,
-        legend=dict(orientation="h", x=0.5, y=-0.35, xanchor="center", font=dict(size=12)),
-        barmode="stack",
-    )
-    fig2.update_yaxes(tickformat="d")
-    st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
-    st.caption(f"סה״כ {len(recent_meals)} ארוחות ב-14 הימים האחרונים")
+        if goal_val:
+            try:
+                gv = float(goal_val)
+                fig2.add_hline(y=gv, line_dash="dash", line_color="#FF9800", line_width=2)
+            except (TypeError, ValueError):
+                pass
+        fig2.update_layout(**BASE_LAYOUT)
+        fig2.update_layout(height=260, margin=dict(l=50, r=50, t=15, b=50))
+        fig2.update_yaxes(tickformat="d")
+        st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
+        caption = "הערכות גסות בלבד."
+        if goal_val:
+            caption += " הקו הכתום — יעד יומי."
+        st.caption(caption)
 
 st.divider()
 
