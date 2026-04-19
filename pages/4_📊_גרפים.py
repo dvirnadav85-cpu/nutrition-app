@@ -94,7 +94,10 @@ st.divider()
 # ── Blood sugar chart ─────────────────────────────────────────────────────────
 st.markdown("### 🩸 מגמת סוכר בדם")
 
-bs_rows = db.select("blood_sugar_log", order="log_date.asc")
+try:
+    bs_rows = db.select("blood_sugar_log", order="log_date.asc")
+except Exception:
+    bs_rows = []
 
 if len(bs_rows) < 2:
     st.info("יש לרשום לפחות שתי מדידות סוכר כדי לראות גרף. ספרי לעוזרת את הסוכר שלך בשיחה!")

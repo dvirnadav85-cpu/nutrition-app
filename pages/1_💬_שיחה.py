@@ -80,7 +80,10 @@ def load_data_context() -> str:
                 pass
 
     # Blood sugar: last 14 daily readings from chat
-    bs_rows = db.select("blood_sugar_log", order="log_date.desc", limit=14)
+    try:
+        bs_rows = db.select("blood_sugar_log", order="log_date.desc", limit=14)
+    except Exception:
+        bs_rows = []
     if bs_rows:
         bs_lines = ["מדידות סוכר בדם אחרונות:"]
         for r in reversed(bs_rows):
