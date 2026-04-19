@@ -241,6 +241,67 @@ else:
 
 st.divider()
 
+# ── Sleep chart ───────────────────────────────────────────────────────────────
+st.markdown("### 😴 מגמת שינה")
+
+try:
+    sleep_rows = db.select("sleep_log", order="log_date.asc")
+except Exception:
+    sleep_rows = []
+
+QUALITY_SCORE = {"גרוע מאוד": 1, "גרוע": 2, "בינוני": 3, "טוב": 4, "מעולה": 5}
+
+if len(sleep_rows) < 2:
+    st.info("יש לרשום לפחות שני לילות כדי לראות גרף. ספרי לעוזרת בבוקר איך ישנת!")
+else:
+    s_dates = [short_date(r["log_date"]) for r in sleep_rows]
+    s_hours = [float(r["duration_hours"]) if r.get("duration_hours") is not None else None
+               for r in sleep_rows]
+    s_scores = [QUALITY_SCORE.get(r.get("quality", ""), None) for r in sleep_rows]
+
+    valid_hours = [h for h in s_hours if h is not None]
+    valid_scores = [s for s in s_scores if s is not None]
+
+    col1, col2, col3 = st.columns(3)
+    if valid_hours:
+        col1.metric("ממוצע שעות", f"{sum(valid_hours)/len(valid_hours):.1f}")
+    if valid_scores:
+        col2.metric("ממוצע איכות", f"{sum(valid_scores)/len(valid_scores):.1f}/5")
+    col3.metric("לילות", len(sleep_rows))
+
+    # Duration bars
+    fig_s = go.Figure()
+    fig_s.add_trace(go.Bar(
+        x=s_dates,
+        y=[h if h is not None else 0 for h in s_hours],
+        marker_color="#7E57C2",
+        name="שעות",
+        hoverinfo="skip",
+    ))
+    # Quality dots on a secondary y-axis
+    quality_x = [d for d, s in zip(s_dates, s_scores) if s is not None]
+    quality_y = [s for s in s_scores if s is not None]
+    if quality_y:
+        fig_s.add_trace(go.Scatter(
+            x=quality_x, y=quality_y,
+            mode="markers",
+            marker=dict(size=11, color="#FFB300",
+                        line=dict(color="#333", width=1)),
+            yaxis="y2",
+            name="איכות",
+            hoverinfo="skip",
+        ))
+        fig_s.update_layout(
+            yaxis2=dict(overlaying="y", side="right", range=[0.5, 5.5],
+                        tickvals=[1,2,3,4,5], gridcolor="rgba(0,0,0,0)"),
+        )
+    fig_s.update_layout(**BASE_LAYOUT)
+    fig_s.update_layout(height=260, margin=dict(l=50, r=50, t=15, b=50))
+    st.plotly_chart(fig_s, use_container_width=True, config=PLOTLY_CONFIG)
+    st.caption("🟣 עמודות — שעות שינה  |  🟡 נקודות — איכות (1=גרוע מאוד, 5=מעולה)")
+
+st.divider()
+
 # ── Blood markers over time ───────────────────────────────────────────────────
 st.markdown("### 🩸 מגמות בדיקות דם לאורך זמן")
 
