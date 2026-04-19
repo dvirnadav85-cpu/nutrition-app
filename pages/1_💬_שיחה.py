@@ -79,6 +79,15 @@ def load_data_context() -> str:
             except Exception:
                 pass
 
+    # Blood sugar: last 14 daily readings from chat
+    bs_rows = db.select("blood_sugar_log", order="log_date.desc", limit=14)
+    if bs_rows:
+        bs_lines = ["מדידות סוכר בדם אחרונות:"]
+        for r in reversed(bs_rows):
+            time_str = f" ({r['reading_time']})" if r.get("reading_time") else ""
+            bs_lines.append(f"  {r.get('log_date','')}{time_str}: {r.get('value_mgdl','')} mg/dL")
+        parts.append("\n".join(bs_lines))
+
     return "\n\n".join(parts)
 
 # ── Session summaries ──────────────────────────────────────────────────────────
@@ -121,6 +130,12 @@ SYSTEM_PROMPT = """את עוזרת תזונה אישית חמה ומעודדת �
 כאשר מירה מזכירה תרופה, תוסף, או ויטמין שהיא נוטלת באופן קבוע, תגיבי בחום ובסוף הוסיפי:
 <!--MEDICATION:{{"medications":"רשימת התרופות והתוספים"}}-->
 
+**רישום סוכר בדם:**
+כאשר מירה מציינת ערך סוכר בדם (גלוקוז), תגיבי בחום ובסוף הוסיפי:
+<!--BLOOD_SUGAR:{{"value": 95, "reading_time": "בוקר"}}-->
+זמני מדידה אפשריים: בוקר (בצום), אחרי ארוחה, ערב, לפני שינה
+אם לא צוין זמן, השמיטי את reading_time.
+
 אל תכתבי תגיות אם לא צוין מידע רלוונטי."""
 
 def get_system(force_reload: bool = False) -> str:
@@ -142,26 +157,28 @@ def cached_system_param(system: str) -> list:
     return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
 # ── Tag parsing ────────────────────────────────────────────────────────────────
-def parse_tags(text: str) -> tuple[str, dict | None, dict | None, dict | None, dict | None]:
-    meal_data = weight_data = activity_data = medication_data = None
+def parse_tags(text: str) -> tuple[str, dict | None, dict | None, dict | None, dict | None, dict | None]:
+    meal_data = weight_data = activity_data = medication_data = blood_sugar_data = None
     for tag, store in [
-        (r'<!--MEAL:(\{.*?\})-->',       'meal'),
-        (r'<!--WEIGHT:(\{.*?\})-->',     'weight'),
-        (r'<!--ACTIVITY:(\{.*?\})-->',   'activity'),
-        (r'<!--MEDICATION:(\{.*?\})-->', 'medication'),
+        (r'<!--MEAL:(\{.*?\})-->',         'meal'),
+        (r'<!--WEIGHT:(\{.*?\})-->',       'weight'),
+        (r'<!--ACTIVITY:(\{.*?\})-->',     'activity'),
+        (r'<!--MEDICATION:(\{.*?\})-->',   'medication'),
+        (r'<!--BLOOD_SUGAR:(\{.*?\})-->', 'blood_sugar'),
     ]:
         m = re.search(tag, text, re.DOTALL)
         if m:
             try:
                 parsed = json.loads(m.group(1))
                 text = text[:m.start()].rstrip() + text[m.end():]
-                if store == 'meal':       meal_data       = parsed
-                elif store == 'weight':   weight_data     = parsed
-                elif store == 'activity': activity_data   = parsed
-                else:                     medication_data = parsed
+                if store == 'meal':         meal_data         = parsed
+                elif store == 'weight':     weight_data       = parsed
+                elif store == 'activity':   activity_data     = parsed
+                elif store == 'medication': medication_data   = parsed
+                else:                       blood_sugar_data  = parsed
             except json.JSONDecodeError:
                 pass
-    return text.strip(), meal_data, weight_data, activity_data, medication_data
+    return text.strip(), meal_data, weight_data, activity_data, medication_data, blood_sugar_data
 
 # ── DB helpers ─────────────────────────────────────────────────────────────────
 def save_meal(raw_input: str, meal_type: str, description: str):
@@ -196,6 +213,12 @@ def update_activity(description: str):
     if rows:
         db.update("profile", {"daily_activity": description}, {"id": rows[0]["id"]})
         st.session_state.cached_profile = None
+
+def save_blood_sugar(value: float, reading_time: str | None = None):
+    row = {"log_date": date.today().isoformat(), "value_mgdl": value}
+    if reading_time:
+        row["reading_time"] = reading_time
+    db.insert("blood_sugar_log", row)
 
 def update_medications(medications: str):
     rows = db.select("profile", filters={"is_current": "true"}, order="created_at.desc", limit=1)
@@ -336,11 +359,17 @@ if active_photo and not st.session_state.get("_last_photo") == active_photo.name
         with st.spinner("מזהה את האוכל בתמונה..."):
             raw_reply = analyze_photo(image_bytes)
 
-        clean_reply, meal_data, weight_data, activity_data, medication_data = parse_tags(raw_reply)
+        clean_reply, meal_data, weight_data, activity_data, medication_data, blood_sugar_data = parse_tags(raw_reply)
 
         if meal_data:
             save_meal("[תמונה]", meal_data.get("type", "ארוחה"), meal_data.get("description", ""))
             clean_reply += "\n\n*✅ הארוחה נרשמה ביומן*"
+
+        if blood_sugar_data:
+            save_blood_sugar(float(blood_sugar_data.get("value", 0)), blood_sugar_data.get("reading_time"))
+            clean_reply += f"\n\n*✅ סוכר בדם נרשם: {blood_sugar_data.get('value')} mg/dL*"
+
+        if any([meal_data, blood_sugar_data]):
             get_system(force_reload=True)
 
         st.markdown(clean_reply)
@@ -372,7 +401,7 @@ if prompt := st.chat_input("כתבי הודעה..."):
             )
             raw_reply = response.content[0].text
 
-        clean_reply, meal_data, weight_data, activity_data, medication_data = parse_tags(raw_reply)
+        clean_reply, meal_data, weight_data, activity_data, medication_data, blood_sugar_data = parse_tags(raw_reply)
 
         if meal_data:
             save_meal(prompt, meal_data.get("type", "ארוחה"), meal_data.get("description", ""))
@@ -390,7 +419,11 @@ if prompt := st.chat_input("כתבי הודעה..."):
             update_medications(medication_data.get("medications", ""))
             clean_reply += f"\n\n*✅ התרופות עודכנו בפרופיל*"
 
-        if any([meal_data, weight_data, activity_data, medication_data]):
+        if blood_sugar_data:
+            save_blood_sugar(float(blood_sugar_data.get("value", 0)), blood_sugar_data.get("reading_time"))
+            clean_reply += f"\n\n*✅ סוכר בדם נרשם: {blood_sugar_data.get('value')} mg/dL*"
+
+        if any([meal_data, weight_data, activity_data, medication_data, blood_sugar_data]):
             get_system(force_reload=True)
 
         st.markdown(clean_reply)

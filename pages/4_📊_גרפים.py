@@ -91,6 +91,57 @@ else:
 
 st.divider()
 
+# ── Blood sugar chart ─────────────────────────────────────────────────────────
+st.markdown("### 🩸 מגמת סוכר בדם")
+
+bs_rows = db.select("blood_sugar_log", order="log_date.asc")
+
+if len(bs_rows) < 2:
+    st.info("יש לרשום לפחות שתי מדידות סוכר כדי לראות גרף. ספרי לעוזרת את הסוכר שלך בשיחה!")
+else:
+    bs_dates  = [short_date(r["log_date"]) for r in bs_rows]
+    bs_values = [float(r["value_mgdl"])    for r in bs_rows]
+
+    last_bs = bs_values[-1]
+    avg_bs  = sum(bs_values) / len(bs_values)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("מדידה אחרונה", f"{last_bs:.0f} mg/dL")
+    col2.metric("ממוצע", f"{avg_bs:.0f} mg/dL")
+    col3.metric("מדידות", len(bs_rows))
+
+    fig_bs = go.Figure()
+    fig_bs.add_trace(go.Scatter(
+        x=bs_dates, y=bs_values,
+        mode="lines+markers",
+        line=dict(color="#E53935", width=3),
+        marker=dict(size=8, color="#E53935"),
+        hoverinfo="skip",
+    ))
+    # trend line when ≥3 points
+    if len(bs_values) >= 3:
+        n = len(bs_values)
+        xi = list(range(n))
+        mx, my = sum(xi)/n, sum(bs_values)/n
+        slope = sum((xi[i]-mx)*(bs_values[i]-my) for i in range(n)) / \
+                sum((xi[i]-mx)**2 for i in range(n))
+        intercept = my - slope * mx
+        trend = [intercept + slope * i for i in xi]
+        fig_bs.add_trace(go.Scatter(
+            x=bs_dates, y=trend,
+            mode="lines",
+            line=dict(color="#FF9800", width=2, dash="dash"),
+            hoverinfo="skip",
+        ))
+
+    y_pad = max((max(bs_values) - min(bs_values)) * 0.25, 5)
+    fig_bs.update_layout(**BASE_LAYOUT)
+    fig_bs.update_yaxes(range=[min(bs_values) - y_pad, max(bs_values) + y_pad])
+    st.plotly_chart(fig_bs, use_container_width=True, config=PLOTLY_CONFIG)
+    st.caption("🔴 קו אדום — סוכר בפועל  |  🟠 קו כתום — מגמה")
+
+st.divider()
+
 # ── Meals per day ─────────────────────────────────────────────────────────────
 st.markdown("### 🍽️ ארוחות ב-14 הימים האחרונים")
 
