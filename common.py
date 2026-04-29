@@ -95,9 +95,18 @@ SHARED_CSS = """
     }
     button, [role="button"] { -webkit-tap-highlight-color: transparent; }
 
-    /* Global typography + cream background */
-    html, body, [class*="st-"], .stApp, .stMarkdown, button, input, textarea, select {
+    /* Global typography + cream background.
+       NOTE: do NOT use [class*="st-"] — that selector overrides the Material
+       Icons font on Streamlit's icon spans, making chevrons render as the
+       literal text "keyboard_arrow_down" and the upload icon as "upload". */
+    html, body, .stApp, .stMarkdown, p, label, button, input, textarea, select,
+    h1, h2, h3, h4, h5, h6 {
         font-family: 'Assistant', -apple-system, sans-serif;
+    }
+    /* Belt-and-braces: keep Material Icons rendering as glyphs */
+    span.material-icons, span[class*="material-icons"],
+    [data-testid="stIconMaterial"], i.material-icons {
+        font-family: 'Material Icons', 'Material Symbols Outlined' !important;
     }
 
     .stApp {
@@ -440,7 +449,7 @@ def show_nutrition_table(for_date: str | None = None):
 
     st.markdown(f"### 📋 תזונה {label}")
 
-    rows_html = []
+    rows_html_parts = []
     has_rows = False
     for k, goal in goals.items():
         try:
@@ -461,81 +470,45 @@ def show_nutrition_table(for_date: str | None = None):
         else:
             bar_color = "var(--ic-coral)"
 
-        rows_html.append(f"""
-        <div class="nut-row">
-            <div class="nut-name">{name}</div>
-            <div class="nut-vals">
-                <span class="nut-eaten">{eaten:.0f}</span>
-                <span class="nut-sep">/</span>
-                <span class="nut-goal">{goal_num:.0f}{unit_suffix}</span>
-                <span class="nut-pct">{int(pct_raw)}%</span>
-            </div>
-            <div class="nut-track">
-                <div class="nut-fill" style="width:{min(100, pct_clamped):.0f}%; background:{bar_color};"></div>
-            </div>
-        </div>
-        """)
+        # IMPORTANT: keep this on a single line (no leading whitespace) — markdown
+        # treats indented HTML as a code block, even with unsafe_allow_html.
+        rows_html_parts.append(
+            f'<div class="nut-row">'
+            f'<div class="nut-name">{name}</div>'
+            f'<div class="nut-vals">'
+            f'<span class="nut-eaten">{eaten:.0f}</span>'
+            f'<span class="nut-sep">/</span>'
+            f'<span class="nut-goal">{goal_num:.0f}{unit_suffix}</span>'
+            f'<span class="nut-pct">{int(pct_raw)}%</span>'
+            f'</div>'
+            f'<div class="nut-track">'
+            f'<div class="nut-fill" style="width:{min(100, pct_clamped):.0f}%; background:{bar_color};"></div>'
+            f'</div>'
+            f'</div>'
+        )
 
     if not has_rows:
         st.info("היעדים שהוגדרו אינם תקינים. נסי לעדכן בשיחה.")
         return
 
-    table_css = """
-    <style>
-    .nut-card {
-        background: var(--card-bg);
-        border: 1px solid rgba(107, 142, 111, 0.14);
-        border-radius: 16px;
-        padding: 0.75rem 1rem;
-        box-shadow: var(--shadow-sm);
-        margin-bottom: 1rem;
-    }
-    .nut-row {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        grid-template-areas: "name vals" "track track";
-        align-items: center;
-        gap: 0.25rem 0.75rem;
-        padding: 0.55rem 0;
-        border-bottom: 1px solid rgba(107, 142, 111, 0.08);
-    }
-    .nut-row:last-child { border-bottom: none; }
-    .nut-name {
-        grid-area: name;
-        font-weight: 600;
-        color: var(--text-dark);
-        font-size: 0.98rem;
-    }
-    .nut-vals {
-        grid-area: vals;
-        font-size: 0.92rem;
-        color: var(--text-medium);
-        white-space: nowrap;
-    }
-    .nut-eaten { color: var(--sage-deep); font-weight: 700; }
-    .nut-sep   { color: var(--text-muted); margin: 0 0.15rem; }
-    .nut-pct   {
-        margin-inline-start: 0.6rem;
-        background: var(--tint-sage);
-        color: var(--sage-deep);
-        font-weight: 600;
-        padding: 0.05rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.82rem;
-    }
-    .nut-track {
-        grid-area: track;
-        height: 8px;
-        background: var(--bg-cream-deep);
-        border-radius: 999px;
-        overflow: hidden;
-    }
-    .nut-fill {
-        height: 100%;
-        border-radius: 999px;
-        transition: width 0.4s ease;
-    }
-    </style>
-    """
-    st.markdown(table_css + f'<div class="nut-card">{"".join(rows_html)}</div>',
-                unsafe_allow_html=True)
+    table_css = (
+        "<style>"
+        ".nut-card{background:var(--card-bg);border:1px solid rgba(107,142,111,0.14);"
+        "border-radius:16px;padding:0.75rem 1rem;box-shadow:var(--shadow-sm);margin-bottom:1rem;}"
+        ".nut-row{display:grid;grid-template-columns:1fr auto;grid-template-areas:'name vals' 'track track';"
+        "align-items:center;gap:0.25rem 0.75rem;padding:0.55rem 0;"
+        "border-bottom:1px solid rgba(107,142,111,0.08);}"
+        ".nut-row:last-child{border-bottom:none;}"
+        ".nut-name{grid-area:name;font-weight:600;color:var(--text-dark);font-size:0.98rem;}"
+        ".nut-vals{grid-area:vals;font-size:0.92rem;color:var(--text-medium);white-space:nowrap;}"
+        ".nut-eaten{color:var(--sage-deep);font-weight:700;}"
+        ".nut-sep{color:var(--text-muted);margin:0 0.15rem;}"
+        ".nut-pct{margin-inline-start:0.6rem;background:var(--tint-sage);color:var(--sage-deep);"
+        "font-weight:600;padding:0.05rem 0.5rem;border-radius:999px;font-size:0.82rem;}"
+        ".nut-track{grid-area:track;height:8px;background:var(--bg-cream-deep);"
+        "border-radius:999px;overflow:hidden;}"
+        ".nut-fill{height:100%;border-radius:999px;transition:width 0.4s ease;}"
+        "</style>"
+    )
+    html = table_css + '<div class="nut-card">' + "".join(rows_html_parts) + '</div>'
+    st.markdown(html, unsafe_allow_html=True)
