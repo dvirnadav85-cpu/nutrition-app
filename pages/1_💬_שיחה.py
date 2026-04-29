@@ -2,14 +2,8 @@ import os
 import re
 import json
 import base64
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from collections import defaultdict
-
-try:
-    from zoneinfo import ZoneInfo
-    _IL_TZ = ZoneInfo("Asia/Jerusalem")
-except Exception:
-    _IL_TZ = None
 
 import config
 import common
@@ -17,15 +11,8 @@ import anthropic
 import streamlit as st
 import supabase_client as db
 
-def _now_il() -> datetime:
-    return datetime.now(_IL_TZ) if _IL_TZ else datetime.now()
-
-def _period_label(h: int) -> str:
-    if 5 <= h < 11:  return "בוקר"
-    if 11 <= h < 15: return "צהריים"
-    if 15 <= h < 19: return "אחר הצהריים"
-    if 19 <= h < 22: return "ערב"
-    return "לילה"
+_now_il = common.now_il
+_period_label = common.period_label
 
 st.set_page_config(page_title="שיחה", page_icon="💬", layout="centered")
 common.page_setup()
