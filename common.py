@@ -84,7 +84,16 @@ SHARED_CSS = """
         --shadow-lg: 0 12px 28px rgba(74, 92, 75, 0.10), 0 4px 8px rgba(74, 92, 75, 0.04);
     }
 
-    * { direction: rtl; text-align: right; -webkit-tap-highlight-color: transparent; }
+    /* Apply RTL at the app root so children inherit; avoid the universal selector
+       which corrupts widgets with their own internal flex/absolute layout
+       (file_uploader, camera_input, chat_input). */
+    .stApp, .main, .block-container, .stMarkdown,
+    .stChatMessage, .stAlert, .stExpander, .stTable,
+    h1, h2, h3, h4, h5, h6, p, label, span, div[data-testid="stMarkdownContainer"] {
+        direction: rtl;
+        text-align: right;
+    }
+    button, [role="button"] { -webkit-tap-highlight-color: transparent; }
 
     /* Global typography + cream background */
     html, body, [class*="st-"], .stApp, .stMarkdown, button, input, textarea, select {
@@ -205,6 +214,146 @@ SHARED_CSS = """
         box-shadow: var(--shadow-sm);
     }
 
+    /* Chat input bar — cream-friendly */
+    [data-testid="stChatInput"] {
+        background: var(--card-bg) !important;
+        border-radius: 18px !important;
+        border: 1px solid rgba(107, 142, 111, 0.18) !important;
+        box-shadow: var(--shadow-sm);
+    }
+    [data-testid="stChatInput"] textarea {
+        background: transparent !important;
+        color: var(--text-dark) !important;
+        direction: rtl;
+        text-align: right;
+    }
+    [data-testid="stChatInputContainer"] {
+        background: linear-gradient(180deg, transparent, var(--bg-cream-deep) 40%);
+    }
+
+    /* File uploader — clean LTR internals so text doesn't overlap the button */
+    [data-testid="stFileUploader"] {
+        direction: rtl;
+    }
+    [data-testid="stFileUploader"] label {
+        direction: rtl;
+        text-align: right;
+        color: var(--text-medium);
+        font-weight: 500;
+    }
+    [data-testid="stFileUploaderDropzone"] {
+        direction: ltr !important;
+        background: var(--card-bg) !important;
+        border: 1.5px dashed rgba(107, 142, 111, 0.35) !important;
+        border-radius: 16px !important;
+        padding: 1rem !important;
+    }
+    [data-testid="stFileUploaderDropzone"] * {
+        direction: ltr;
+        text-align: left;
+    }
+    [data-testid="stFileUploaderDropzone"] button,
+    [data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"] {
+        background: var(--tint-sage) !important;
+        color: var(--sage-deep) !important;
+        border: 1px solid rgba(92, 126, 96, 0.25) !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        padding: 0.45rem 1rem !important;
+        width: auto !important;
+        margin: 0 !important;
+    }
+    [data-testid="stFileUploaderDropzoneInstructions"] {
+        color: var(--text-medium) !important;
+    }
+    [data-testid="stFileUploaderDropzoneInstructions"] small,
+    [data-testid="stFileUploaderDropzoneInstructions"] span {
+        color: var(--text-muted) !important;
+    }
+
+    /* Camera input — same treatment */
+    [data-testid="stCameraInput"] button,
+    [data-testid="stCameraInputButton"] {
+        background: var(--tint-sage) !important;
+        color: var(--sage-deep) !important;
+        border: 1px solid rgba(92, 126, 96, 0.25) !important;
+        border-radius: 12px !important;
+    }
+
+    /* Expanders — cream cards */
+    [data-testid="stExpander"], details[data-testid="stExpander"] {
+        background: var(--card-bg) !important;
+        border: 1px solid rgba(107, 142, 111, 0.18) !important;
+        border-radius: 16px !important;
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+    [data-testid="stExpander"] summary {
+        color: var(--text-dark) !important;
+        font-weight: 600;
+        padding: 0.85rem 1rem !important;
+    }
+    [data-testid="stExpander"] summary:hover { color: var(--sage-deep) !important; }
+
+    /* Metrics — cream cards */
+    [data-testid="stMetric"] {
+        background: var(--card-bg);
+        border: 1px solid rgba(107, 142, 111, 0.14);
+        border-radius: 14px;
+        padding: 0.7rem 0.9rem;
+        box-shadow: var(--shadow-sm);
+    }
+    [data-testid="stMetricLabel"] { color: var(--text-muted) !important; }
+    [data-testid="stMetricValue"] {
+        color: var(--sage-deep) !important;
+        font-family: 'Frank Ruhl Libre', serif !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stMetricDelta"] { color: var(--text-medium) !important; }
+
+    /* Tables (st.table / st.dataframe) — cream cards with sage header */
+    .stTable table, [data-testid="stTable"] table,
+    [data-testid="stDataFrame"] {
+        background: var(--card-bg) !important;
+        border-radius: 14px !important;
+        overflow: hidden;
+    }
+    .stTable thead tr th, [data-testid="stTable"] thead tr th {
+        background: var(--tint-sage) !important;
+        color: var(--sage-deep) !important;
+        font-weight: 700 !important;
+        border-bottom: 1px solid rgba(107, 142, 111, 0.20) !important;
+    }
+    .stTable tbody tr td, [data-testid="stTable"] tbody tr td {
+        color: var(--text-dark) !important;
+        border-bottom: 1px solid rgba(107, 142, 111, 0.08) !important;
+    }
+    .stTable tbody tr:nth-child(even) td,
+    [data-testid="stTable"] tbody tr:nth-child(even) td {
+        background: var(--bg-cream) !important;
+    }
+
+    /* Plotly chart container — soft card */
+    [data-testid="stPlotlyChart"] {
+        background: var(--card-bg);
+        border: 1px solid rgba(107, 142, 111, 0.14);
+        border-radius: 16px;
+        padding: 0.75rem 0.5rem;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 0.75rem;
+    }
+
+    /* Radio / checkbox / slider — sage accents */
+    .stRadio label, .stCheckbox label { color: var(--text-dark) !important; }
+    [data-baseweb="radio"] [role="radio"][aria-checked="true"] {
+        border-color: var(--sage) !important;
+        background: var(--sage) !important;
+    }
+    .stSlider [data-baseweb="slider"] div[role="slider"] {
+        background: var(--sage-deep) !important;
+        border-color: var(--sage-deep) !important;
+    }
+
     /* Hide Streamlit branding */
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
@@ -289,27 +438,104 @@ def show_nutrition_table(for_date: str | None = None):
     consumed = get_daily_consumed(target)
     label = "היום" if target == date.today().isoformat() else target
 
-    st.markdown(f"**📋 תזונה {label}:**")
-    rows = []
+    st.markdown(f"### 📋 תזונה {label}")
+
+    rows_html = []
+    has_rows = False
     for k, goal in goals.items():
         try:
             goal_num = float(goal)
         except (TypeError, ValueError):
             continue
+        has_rows = True
         name, unit = NUTRIENT_LABELS.get(k, (k, ""))
         eaten = consumed.get(k, 0.0)
-        pct = int(100 * eaten / goal_num) if goal_num > 0 else 0
-        filled = min(10, max(0, pct // 10))
-        bar = "█" * filled + "░" * (10 - filled)
+        pct_raw = (100 * eaten / goal_num) if goal_num > 0 else 0
+        pct_clamped = max(0, min(120, pct_raw))
         unit_suffix = f" {unit}" if unit else ""
-        rows.append({
-            "רכיב": name,
-            "אכלה": f"{eaten:.0f}{unit_suffix}",
-            "יעד": f"{goal_num:.0f}{unit_suffix}",
-            "%": f"{pct}%",
-            "התקדמות": bar,
-        })
-    if rows:
-        st.table(rows)
-    else:
+
+        if pct_raw < 60:
+            bar_color = "var(--ic-clay)"
+        elif pct_raw <= 110:
+            bar_color = "var(--sage)"
+        else:
+            bar_color = "var(--ic-coral)"
+
+        rows_html.append(f"""
+        <div class="nut-row">
+            <div class="nut-name">{name}</div>
+            <div class="nut-vals">
+                <span class="nut-eaten">{eaten:.0f}</span>
+                <span class="nut-sep">/</span>
+                <span class="nut-goal">{goal_num:.0f}{unit_suffix}</span>
+                <span class="nut-pct">{int(pct_raw)}%</span>
+            </div>
+            <div class="nut-track">
+                <div class="nut-fill" style="width:{min(100, pct_clamped):.0f}%; background:{bar_color};"></div>
+            </div>
+        </div>
+        """)
+
+    if not has_rows:
         st.info("היעדים שהוגדרו אינם תקינים. נסי לעדכן בשיחה.")
+        return
+
+    table_css = """
+    <style>
+    .nut-card {
+        background: var(--card-bg);
+        border: 1px solid rgba(107, 142, 111, 0.14);
+        border-radius: 16px;
+        padding: 0.75rem 1rem;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 1rem;
+    }
+    .nut-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas: "name vals" "track track";
+        align-items: center;
+        gap: 0.25rem 0.75rem;
+        padding: 0.55rem 0;
+        border-bottom: 1px solid rgba(107, 142, 111, 0.08);
+    }
+    .nut-row:last-child { border-bottom: none; }
+    .nut-name {
+        grid-area: name;
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 0.98rem;
+    }
+    .nut-vals {
+        grid-area: vals;
+        font-size: 0.92rem;
+        color: var(--text-medium);
+        white-space: nowrap;
+    }
+    .nut-eaten { color: var(--sage-deep); font-weight: 700; }
+    .nut-sep   { color: var(--text-muted); margin: 0 0.15rem; }
+    .nut-pct   {
+        margin-inline-start: 0.6rem;
+        background: var(--tint-sage);
+        color: var(--sage-deep);
+        font-weight: 600;
+        padding: 0.05rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+    }
+    .nut-track {
+        grid-area: track;
+        height: 8px;
+        background: var(--bg-cream-deep);
+        border-radius: 999px;
+        overflow: hidden;
+    }
+    .nut-fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.4s ease;
+    }
+    </style>
+    """
+    st.markdown(table_css + f'<div class="nut-card">{"".join(rows_html)}</div>',
+                unsafe_allow_html=True)

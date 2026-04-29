@@ -30,14 +30,27 @@ def short_date(iso: str) -> str:
     except Exception:
         return iso
 
+# Cream + sage chart palette (matches common.SHARED_CSS)
+SAGE_DEEP = "#4F6B52"
+SAGE      = "#6B8E6F"
+SAGE_SOFT = "#A8C0A0"
+CLAY      = "#B4805E"
+CORAL     = "#C36A55"
+HONEY     = "#B8923A"
+MAUVE     = "#8E6E7F"
+TEXT_DARK = "#2A3829"
+GRID_SOFT = "rgba(107, 142, 111, 0.18)"
+
 BASE_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Arial, sans-serif", size=13),
+    font=dict(family="Assistant, Arial, sans-serif", size=13, color=TEXT_DARK),
     height=220,
-    margin=dict(l=50, r=50, t=15, b=35),   # equal L/R, small top (no Plotly title)
-    xaxis=dict(showgrid=True, gridcolor="#e5e5e5"),
-    yaxis=dict(showgrid=True, gridcolor="#e5e5e5", zeroline=False),
+    margin=dict(l=50, r=50, t=15, b=35),
+    xaxis=dict(showgrid=True, gridcolor=GRID_SOFT, linecolor=GRID_SOFT,
+               tickfont=dict(color=TEXT_DARK)),
+    yaxis=dict(showgrid=True, gridcolor=GRID_SOFT, zeroline=False,
+               linecolor=GRID_SOFT, tickfont=dict(color=TEXT_DARK)),
     showlegend=False,
 )
 
@@ -65,8 +78,8 @@ else:
     fig.add_trace(go.Scatter(
         x=dates, y=weights,
         mode="lines+markers",
-        line=dict(color="#4CAF50", width=3),
-        marker=dict(size=8, color="#4CAF50"),
+        line=dict(color=SAGE, width=3),
+        marker=dict(size=8, color=SAGE_DEEP),
         hoverinfo="skip",
     ))
     # trend line (linear regression) — only when ≥3 points
@@ -81,7 +94,7 @@ else:
         fig.add_trace(go.Scatter(
             x=dates, y=trend,
             mode="lines",
-            line=dict(color="#FF9800", width=2, dash="dash"),
+            line=dict(color=CLAY, width=2, dash="dash"),
             hoverinfo="skip",
         ))
 
@@ -89,7 +102,7 @@ else:
     fig.update_layout(**BASE_LAYOUT)
     fig.update_yaxes(range=[min(weights) - y_pad, max(weights) + y_pad])
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
-    st.caption("🟢 קו ירוק — משקל בפועל  |  🟠 קו כתום — מגמה")
+    st.caption("קו ירוק — משקל בפועל  |  קו חימר — מגמה")
 
 st.divider()
 
@@ -119,8 +132,8 @@ else:
     fig_bs.add_trace(go.Scatter(
         x=bs_dates, y=bs_values,
         mode="lines+markers",
-        line=dict(color="#E53935", width=3),
-        marker=dict(size=8, color="#E53935"),
+        line=dict(color=CORAL, width=3),
+        marker=dict(size=8, color=CORAL),
         hoverinfo="skip",
     ))
     # trend line when ≥3 points
@@ -135,7 +148,7 @@ else:
         fig_bs.add_trace(go.Scatter(
             x=bs_dates, y=trend,
             mode="lines",
-            line=dict(color="#FF9800", width=2, dash="dash"),
+            line=dict(color=CLAY, width=2, dash="dash"),
             hoverinfo="skip",
         ))
 
@@ -143,7 +156,7 @@ else:
     fig_bs.update_layout(**BASE_LAYOUT)
     fig_bs.update_yaxes(range=[min(bs_values) - y_pad, max(bs_values) + y_pad])
     st.plotly_chart(fig_bs, use_container_width=True, config=PLOTLY_CONFIG)
-    st.caption("🔴 קו אדום — סוכר בפועל  |  🟠 קו כתום — מגמה")
+    st.caption("קו אלמוג — סוכר בפועל  |  קו חימר — מגמה")
 
 st.divider()
 
@@ -217,7 +230,7 @@ else:
         if goal_val:
             col3.metric("יעד יומי", f"{float(goal_val):.0f} {unit}".strip())
 
-        bar_colors = ["#4CAF50" if v > 0 else "#e0e0e0" for v in vals]
+        bar_colors = [SAGE if v > 0 else "#E4ECDD" for v in vals]
         fig2 = go.Figure()
         fig2.add_trace(go.Bar(
             x=short_labels, y=vals,
@@ -227,7 +240,7 @@ else:
         if goal_val:
             try:
                 gv = float(goal_val)
-                fig2.add_hline(y=gv, line_dash="dash", line_color="#FF9800", line_width=2)
+                fig2.add_hline(y=gv, line_dash="dash", line_color=CLAY, line_width=2)
             except (TypeError, ValueError):
                 pass
         fig2.update_layout(**BASE_LAYOUT)
@@ -236,7 +249,7 @@ else:
         st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
         caption = "הערכות גסות בלבד."
         if goal_val:
-            caption += " הקו הכתום — יעד יומי."
+            caption += " הקו בצבע חימר — יעד יומי."
         st.caption(caption)
 
 st.divider()
@@ -274,7 +287,7 @@ else:
     fig_s.add_trace(go.Bar(
         x=s_dates,
         y=[h if h is not None else 0 for h in s_hours],
-        marker_color="#7E57C2",
+        marker_color=MAUVE,
         name="שעות",
         hoverinfo="skip",
     ))
@@ -285,8 +298,8 @@ else:
         fig_s.add_trace(go.Scatter(
             x=quality_x, y=quality_y,
             mode="markers",
-            marker=dict(size=11, color="#FFB300",
-                        line=dict(color="#333", width=1)),
+            marker=dict(size=11, color=HONEY,
+                        line=dict(color=TEXT_DARK, width=1)),
             yaxis="y2",
             name="איכות",
             hoverinfo="skip",
@@ -298,7 +311,7 @@ else:
     fig_s.update_layout(**BASE_LAYOUT)
     fig_s.update_layout(height=260, margin=dict(l=50, r=50, t=15, b=50))
     st.plotly_chart(fig_s, use_container_width=True, config=PLOTLY_CONFIG)
-    st.caption("🟣 עמודות — שעות שינה  |  🟡 נקודות — איכות (1=גרוע מאוד, 5=מעולה)")
+    st.caption("עמודות — שעות שינה  |  נקודות — איכות (1=גרוע מאוד, 5=מעולה)")
 
 st.divider()
 
@@ -333,8 +346,7 @@ else:
     if not plottable:
         st.info("צברי לפחות 2 בדיקות דם כדי לראות מגמות.")
     else:
-        BLOOD_COLORS = ["#E53935", "#8E24AA", "#1E88E5", "#43A047",
-                        "#FB8C00", "#00ACC1", "#F4511E", "#6D4C41"]
+        BLOOD_COLORS = [SAGE_DEEP, CLAY, MAUVE, CORAL, HONEY, SAGE, "#7E8AAB", "#A86B59"]
 
         for idx, (marker_name, data_points) in enumerate(sorted(plottable.items())):
             pts = sorted(data_points, key=lambda x: x[0])
