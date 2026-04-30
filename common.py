@@ -84,20 +84,29 @@ SHARED_CSS = """
         --shadow-lg: 0 12px 28px rgba(74, 92, 75, 0.10), 0 4px 8px rgba(74, 92, 75, 0.04);
     }
 
-    /* Apply RTL at the block level only.
-       Do NOT include `span` or `label` here — Streamlit puts Material Icon
-       spans inside expander headers and button labels, and direction:rtl
-       breaks their font ligatures so the icon name leaks out as text
-       (e.g. "keyboard_arrow_down"). Spans inherit direction from their
-       parent block, which is enough. */
+    /* Apply RTL only on top-level page containers and on text-bearing
+       containers (markdown, alerts, headings). Crucially, do NOT include
+       .stExpander here — Streamlit's expander chevron is a span whose
+       text content is a Material Icons ligature like "keyboard_arrow_down",
+       and any inherited direction:rtl kills the ligature so the literal
+       text leaks out. Hebrew text has its own Unicode RTL handling so
+       leaving the expander wrapper LTR doesn't break the title. */
     .stApp, .main, .block-container, .stMarkdown,
-    .stChatMessage, .stAlert, .stExpander, .stTable,
-    h1, h2, h3, h4, h5, h6, p, div[data-testid="stMarkdownContainer"] {
+    .stChatMessage, .stAlert, .stTable,
+    h1, h2, h3, h4, h5, h6, p,
+    div[data-testid="stMarkdownContainer"] {
         direction: rtl;
         text-align: right;
     }
-    /* Force every Material Icon variant Streamlit ships back to LTR + icon
-       font, regardless of any inherited direction. */
+    /* Re-RTL just the bits of the expander we *do* want flipped: the title
+       text container and the body content. The chevron icon is left alone. */
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"],
+    [data-testid="stExpander"] details > div:not(summary) {
+        direction: rtl;
+        text-align: right;
+    }
+    /* Belt and braces: any element that looks like a Material Icon span goes
+       back to LTR + icon font. */
     [data-testid*="Icon"], [class*="material-icons"], [class*="material-symbols"],
     span.material-icons, span.material-symbols-outlined,
     span.material-symbols-rounded {
