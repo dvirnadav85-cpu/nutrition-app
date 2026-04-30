@@ -84,14 +84,28 @@ SHARED_CSS = """
         --shadow-lg: 0 12px 28px rgba(74, 92, 75, 0.10), 0 4px 8px rgba(74, 92, 75, 0.04);
     }
 
-    /* Apply RTL at the app root so children inherit; avoid the universal selector
-       which corrupts widgets with their own internal flex/absolute layout
-       (file_uploader, camera_input, chat_input). */
+    /* Apply RTL at the block level only.
+       Do NOT include `span` or `label` here — Streamlit puts Material Icon
+       spans inside expander headers and button labels, and direction:rtl
+       breaks their font ligatures so the icon name leaks out as text
+       (e.g. "keyboard_arrow_down"). Spans inherit direction from their
+       parent block, which is enough. */
     .stApp, .main, .block-container, .stMarkdown,
     .stChatMessage, .stAlert, .stExpander, .stTable,
-    h1, h2, h3, h4, h5, h6, p, label, span, div[data-testid="stMarkdownContainer"] {
+    h1, h2, h3, h4, h5, h6, p, div[data-testid="stMarkdownContainer"] {
         direction: rtl;
         text-align: right;
+    }
+    /* Force every Material Icon variant Streamlit ships back to LTR + icon
+       font, regardless of any inherited direction. */
+    [data-testid*="Icon"], [class*="material-icons"], [class*="material-symbols"],
+    span.material-icons, span.material-symbols-outlined,
+    span.material-symbols-rounded {
+        direction: ltr !important;
+        unicode-bidi: isolate !important;
+        font-family: 'Material Symbols Rounded', 'Material Symbols Outlined',
+                     'Material Icons' !important;
+        text-align: center !important;
     }
     button, [role="button"] { -webkit-tap-highlight-color: transparent; }
 
@@ -510,5 +524,7 @@ def show_nutrition_table(for_date: str | None = None):
         ".nut-fill{height:100%;border-radius:999px;transition:width 0.4s ease;}"
         "</style>"
     )
+    # Use st.html so markdown's block-mode parser doesn't trip on the nested
+    # divs (which it does — only the first row renders, the rest leak as text).
     html = table_css + '<div class="nut-card">' + "".join(rows_html_parts) + '</div>'
-    st.markdown(html, unsafe_allow_html=True)
+    st.html(html)
